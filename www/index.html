@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gastos de la Familia</title>
+<meta name="theme-color" content="#2563eb">
+<style>
+  :root{
+    --azul:#2563eb; --azul-d:#1d4ed8; --fondo:#f4f6fb; --texto:#1f2430;
+    --tarjeta:#fff; --borde:#e3e7ef; --rojo:#dc2626; --verde:#16a34a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,system-ui,'Segoe UI',sans-serif;background:var(--fondo);color:var(--texto);padding-bottom:90px}
+  header{background:var(--azul);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+  header h1{font-size:1.1rem;margin:0;font-weight:700}
+  header .usuario{font-size:.8rem;opacity:.9}
+  #btnSalir{background:rgba(255,255,255,.18);border:0;color:#fff;padding:8px 12px;border-radius:8px;font-size:.8rem}
+
+  main{max-width:560px;margin:0 auto;padding:16px}
+  .card{background:var(--tarjeta);border:1px solid var(--borde);border-radius:14px;padding:16px;margin-bottom:16px}
+
+  #vistaLogin{max-width:360px;margin:60px auto;padding:0 20px}
+  #vistaLogin h1{text-align:center;font-size:1.3rem;margin-bottom:24px}
+  .campo{margin-bottom:14px}
+  .campo label{display:block;font-size:.85rem;font-weight:600;margin-bottom:6px}
+  input,select{width:100%;padding:12px;border:1px solid var(--borde);border-radius:10px;font-size:1rem;background:#fff}
+  button.principal{width:100%;padding:13px;background:var(--azul);color:#fff;border:0;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer}
+  button.principal:active{background:var(--azul-d)}
+  .error{color:var(--rojo);font-size:.85rem;margin-top:10px;text-align:center}
+
+  .mesSelector{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .mesSelector button{background:#fff;border:1px solid var(--borde);border-radius:8px;width:38px;height:38px;font-size:1.1rem}
+  .mesSelector span{font-weight:700;font-size:1.05rem;text-transform:capitalize}
+
+  .totalGrande{font-size:2rem;font-weight:800;color:var(--azul)}
+  .subTotales{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .chip{background:var(--fondo);border-radius:10px;padding:8px 12px;font-size:.82rem;flex:1;min-width:120px}
+  .chip b{display:block;font-size:1rem}
+
+  .barra{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:.85rem}
+  .barra .nombre{width:120px;flex-shrink:0}
+  .barra .fondo{flex:1;background:var(--fondo);border-radius:6px;height:10px;overflow:hidden}
+  .barra .relleno{background:var(--azul);height:100%;border-radius:6px}
+  .barra .monto{width:80px;text-align:right;flex-shrink:0}
+
+  .gasto{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--borde)}
+  .gasto:last-child{border-bottom:0}
+  .gasto .info{display:flex;flex-direction:column}
+  .gasto .cat{font-weight:600;font-size:.95rem}
+  .gasto .meta{font-size:.78rem;color:#6b7280;margin-top:2px}
+  .gasto .monto{font-weight:700;color:var(--texto);margin-right:10px}
+  .gasto .borrar{background:none;border:0;color:var(--rojo);font-size:1.1rem;padding:4px 8px;cursor:pointer}
+  .vacio{text-align:center;color:#6b7280;padding:30px 0;font-size:.9rem}
+
+  #btnAgregar{position:fixed;bottom:20px;right:20px;left:20px;max-width:520px;margin:0 auto;background:var(--azul);color:#fff;border:0;border-radius:14px;padding:16px;font-size:1rem;font-weight:700;box-shadow:0 6px 18px rgba(37,99,235,.35);cursor:pointer}
+
+  #modalFondo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;align-items:flex-end;justify-content:center}
+  #modalFondo.abierto{display:flex}
+  #modal,#modalGestion{background:#fff;width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:20px;max-height:85vh;overflow-y:auto}
+  #modal h2,#modalGestion h2{margin-top:0;font-size:1.1rem}
+  .catGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+  .catBtn{padding:12px 4px;border:1.5px solid var(--borde);border-radius:10px;background:#fff;font-size:.82rem;cursor:pointer;text-align:center}
+  .catBtn.activo{border-color:var(--azul);background:#eff4ff;color:var(--azul);font-weight:700}
+  .catBtn.nueva{border-style:dashed;color:var(--azul);font-weight:700}
+  #formNuevaCat{display:none;gap:8px;margin-bottom:14px}
+  #formNuevaCat.abierto{display:flex}
+  #formNuevaCat input{flex:1}
+  #formNuevaCat button{flex-shrink:0;width:auto;padding:0 14px;border-radius:10px;background:var(--azul);color:#fff;border:0;font-size:.85rem}
+  .accionesModal{display:flex;gap:10px;margin-top:16px}
+  .accionesModal button{flex:1}
+  #btnCancelar{background:var(--fondo);color:var(--texto)}
+
+  .analisisFila{display:flex;justify-content:space-between;align-items:center;padding:7px 0;font-size:.87rem}
+  .analisisFila:not(:last-child){border-bottom:1px solid var(--borde)}
+  .subeVerde{color:var(--rojo);font-weight:700}
+  .bajaVerde{color:var(--verde);font-weight:700}
+
+  .linkChico{background:none;border:0;color:var(--azul);font-size:.8rem;padding:4px;cursor:pointer;text-decoration:underline}
+
+  #modalGestionFondo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:60;align-items:flex-end;justify-content:center}
+  #modalGestionFondo.abierto{display:flex}
+  .filaCatGestion{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--borde)}
+  .filaCatGestion:last-child{border-bottom:0}
+  .filaCatGestion .nombreCat{flex:1;font-size:.92rem}
+  .filaCatGestion input{flex:1;padding:8px 10px;font-size:.92rem}
+  .filaCatGestion button{background:none;border:0;font-size:1rem;padding:6px;cursor:pointer;flex-shrink:0}
+  .filaCatGestion .btnBorrarCat{color:var(--rojo)}
+  .filaCatGestion .btnEditarCat{color:var(--azul)}
+  .filaCatGestion .btnGuardarEdicion{color:var(--verde)}
+
+  .oculto{display:none !important}
+  #pantallaCarga{position:fixed;inset:0;background:var(--fondo);display:flex;align-items:center;justify-content:center;font-size:.95rem;color:#6b7280;z-index:100}
+</style>
+</head>
+<body>
+
+<div id="pantallaCarga">Cargando…</div>
+
+<section id="vistaLogin" class="oculto">
+  <h1>💸 Gastos de la Familia</h1>
+  <div class="card">
+    <div class="campo">
+      <label>Usuario</label>
+      <input id="loginNombre" placeholder="Tu nombre" autocomplete="username">
+    </div>
+    <div class="campo">
+      <label>Contraseña</label>
+      <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="principal" id="btnLogin">Ingresar</button>
+    <div class="error oculto" id="loginError"></div>
+  </div>
+</section>
+
+<div id="vistaApp" class="oculto">
+  <header>
+    <h1>💸 Gastos Familia</h1>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="usuario" id="nombreUsuario"></span>
+      <button id="btnSalir">Salir</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="mesSelector">
+      <button id="mesAnterior">‹</button>
+      <span id="mesActual"></span>
+      <button id="mesSiguiente">›</button>
+    </div>
+
+    <div class="card">
+      <div class="totalGrande" id="totalMes">$0</div>
+      <div style="font-size:.8rem;color:#6b7280;margin-top:2px">Total del mes</div>
+      <div class="subTotales" id="subTotalesUsuarios"></div>
+    </div>
+
+    <div class="card" id="cardAnalisis">
+      <div style="font-weight:700;margin-bottom:10px;font-size:.9rem">Análisis del mes</div>
+      <div id="analisisContenido"></div>
+    </div>
+
+    <div class="card" id="cardResumen">
+      <div style="font-weight:700;margin-bottom:10px;font-size:.9rem">Por categoría</div>
+      <div id="resumenCategorias"></div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:700;margin-bottom:10px;font-size:.9rem">Movimientos</div>
+      <div id="listaGastos"></div>
+    </div>
+  </main>
+
+  <button id="btnAgregar">+ Agregar gasto</button>
+</div>
+
+<div id="modalFondo">
+  <div id="modal">
+    <h2>Nuevo gasto</h2>
+    <div class="campo">
+      <label>Categoría</label>
+      <div class="catGrid" id="catGrid"></div>
+      <div id="formNuevaCat">
+        <input id="inputNuevaCat" placeholder="Nombre de la categoría" maxlength="40">
+        <button type="button" id="btnGuardarCat">Crear</button>
+      </div>
+      <div style="text-align:right;margin-top:-6px">
+        <button type="button" id="btnGestionarCats" class="linkChico">✏️ Editar categorías</button>
+      </div>
+    </div>
+    <div class="campo">
+      <label>Monto ($)</label>
+      <input id="inputMonto" type="number" inputmode="decimal" placeholder="0" min="0" step="0.01">
+    </div>
+    <div class="campo">
+      <label>Descripción (opcional)</label>
+      <input id="inputDescripcion" placeholder="Ej: Verdulería del barrio">
+    </div>
+    <div class="campo">
+      <label>Fecha</label>
+      <input id="inputFecha" type="date">
+    </div>
+    <div class="error oculto" id="modalError"></div>
+    <div class="accionesModal">
+      <button id="btnCancelar" class="principal">Cancelar</button>
+      <button id="btnGuardar" class="principal">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modalGestionFondo">
+  <div id="modalGestion">
+    <h2>Editar categorías</h2>
+    <div id="listaCategoriasGestion"></div>
+    <div class="error oculto" id="gestionError"></div>
+    <div class="accionesModal">
+      <button id="btnCerrarGestion" class="principal">Listo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase (SDK compat, vía CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<script>
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const DOMINIO_INTERNO = 'familia.local'; // nombre de usuario -> nombre@familia.local
+
+let CATEGORIAS = []; // [{id, nombre, icono}]
+let mesActual = new Date();
+let categoriaSeleccionada = null;
+let usuarioActual = null; // {uid, nombre}
+
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => '$' + Number(n).toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:2});
+const claveMes = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+const nombreMes = (d) => d.toLocaleDateString('es-AR', {month:'long', year:'numeric'});
+const iconoDe = (nombreCat) => (CATEGORIAS.find(c => c.nombre === nombreCat) || {}).icono || '🏷️';
+function formatearFecha(fechaISO){ const [y,m,d] = fechaISO.split('-'); return `${d}/${m}`; }
+
+// ---------- LOGIN ----------
+$('btnLogin').addEventListener('click', async () => {
+  const nombre = $('loginNombre').value.trim();
+  const pass = $('loginPass').value;
+  $('loginError').classList.add('oculto');
+  if (!nombre || !pass) return;
+  const email = nombre.toLowerCase().replace(/\s+/g,'') + '@' + DOMINIO_INTERNO;
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+    // onAuthStateChanged se encarga de entrar a la app
+  } catch(e){
+    $('loginError').textContent = 'Usuario o contraseña incorrectos';
+    $('loginError').classList.remove('oculto');
+  }
+});
+
+$('btnSalir').addEventListener('click', async () => {
+  await auth.signOut();
+});
+
+auth.onAuthStateChanged(async (user) => {
+  $('pantallaCarga').classList.add('oculto');
+  if (user) {
+    const nombre = user.email.split('@')[0];
+    usuarioActual = { uid: user.uid, nombre };
+    $('vistaLogin').classList.add('oculto');
+    $('vistaApp').classList.remove('oculto');
+    $('nombreUsuario').textContent = nombre;
+    await cargarCategorias();
+    construirGridCategorias();
+    cargarMes();
+  } else {
+    usuarioActual = null;
+    $('vistaApp').classList.add('oculto');
+    $('vistaLogin').classList.remove('oculto');
+  }
+});
+
+// ---------- CATEGORÍAS ----------
+async function cargarCategorias(){
+  const snap = await db.collection('categorias').orderBy('nombre').get();
+  if (snap.empty) {
+    await sembrarCategoriasPorDefecto();
+    return cargarCategorias();
+  }
+  CATEGORIAS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function sembrarCategoriasPorDefecto(){
+  const defaults = [
+    ['Comida','🍽️'], ['Supermercado','🛒'], ['Quiosco','🍬'], ['Transporte','🚌'],
+    ['Regalos','🎁'], ['Gastos escolares','🎒'], ['Salud','💊'], ['Hogar','🏠'], ['Otros','📦'],
+  ];
+  const batch = db.batch();
+  defaults.forEach(([nombre, icono]) => {
+    const ref = db.collection('categorias').doc();
+    batch.set(ref, { nombre, icono });
+  });
+  await batch.commit();
+}
+
+function construirGridCategorias(){
+  const botones = CATEGORIAS.map(c => `
+    <button type="button" class="catBtn" data-cat="${c.nombre}">${c.icono} ${c.nombre}</button>
+  `).join('');
+  $('catGrid').innerHTML = botones + `<button type="button" class="catBtn nueva" id="btnNuevaCat">+ Nueva</button>`;
+
+  $('catGrid').querySelectorAll('.catBtn[data-cat]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      categoriaSeleccionada = btn.dataset.cat;
+      $('formNuevaCat').classList.remove('abierto');
+      $('catGrid').querySelectorAll('.catBtn').forEach(b => b.classList.remove('activo'));
+      btn.classList.add('activo');
+    });
+  });
+
+  $('btnNuevaCat').addEventListener('click', () => {
+    $('formNuevaCat').classList.add('abierto');
+    $('inputNuevaCat').value = '';
+    $('inputNuevaCat').focus();
+  });
+}
+
+$('btnGuardarCat').addEventListener('click', crearCategoria);
+$('inputNuevaCat').addEventListener('keydown', (e) => { if (e.key === 'Enter') crearCategoria(); });
+
+async function crearCategoria(){
+  const nombre = $('inputNuevaCat').value.trim();
+  if (!nombre) return;
+  try {
+    const existe = CATEGORIAS.find(c => c.nombre.toLowerCase() === nombre.toLowerCase());
+    if (existe) throw new Error('Esa categoría ya existe');
+    await db.collection('categorias').add({ nombre, icono: '🏷️' });
+    await cargarCategorias();
+    construirGridCategorias();
+    const btn = [...$('catGrid').querySelectorAll('.catBtn[data-cat]')].find(b => b.dataset.cat === nombre);
+    if (btn){
+      categoriaSeleccionada = nombre;
+      $('catGrid').querySelectorAll('.catBtn').forEach(b => b.classList.remove('activo'));
+      btn.classList.add('activo');
+    }
+    $('formNuevaCat').classList.remove('abierto');
+  } catch(e){
+    mostrarErrorModal(e.message);
+  }
+}
+
+// ---------- GESTIONAR CATEGORÍAS ----------
+$('btnGestionarCats').addEventListener('click', () => {
+  renderGestionCategorias();
+  $('gestionError').classList.add('oculto');
+  $('modalGestionFondo').classList.add('abierto');
+});
+$('btnCerrarGestion').addEventListener('click', () => $('modalGestionFondo').classList.remove('abierto'));
+$('modalGestionFondo').addEventListener('click', (e) => { if (e.target === $('modalGestionFondo')) $('modalGestionFondo').classList.remove('abierto'); });
+
+function renderGestionCategorias(){
+  const cont = $('listaCategoriasGestion');
+  cont.innerHTML = CATEGORIAS.map(c => `
+    <div class="filaCatGestion" data-id="${c.id}">
+      <span class="nombreCat">${c.icono} ${c.nombre}</span>
+      <button type="button" class="btnEditarCat" title="Renombrar">✏️</button>
+      <button type="button" class="btnBorrarCat" title="Eliminar">🗑️</button>
+    </div>
+  `).join('');
+
+  cont.querySelectorAll('.filaCatGestion').forEach(fila => {
+    const id = fila.dataset.id;
+    const cat = CATEGORIAS.find(c => c.id === id);
+
+    fila.querySelector('.btnEditarCat').addEventListener('click', () => {
+      fila.innerHTML = `
+        <input value="${cat.nombre}" maxlength="40">
+        <button type="button" class="btnGuardarEdicion" title="Guardar">✔️</button>
+        <button type="button" class="btnBorrarCat" title="Cancelar">✕</button>
+      `;
+      const input = fila.querySelector('input');
+      input.focus(); input.select();
+      fila.querySelector('.btnGuardarEdicion').addEventListener('click', () => guardarEdicionCategoria(cat, input.value.trim()));
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') guardarEdicionCategoria(cat, input.value.trim()); });
+      fila.querySelectorAll('.btnBorrarCat')[0].addEventListener('click', () => renderGestionCategorias());
+    });
+
+    fila.querySelector('.btnBorrarCat').addEventListener('click', async () => {
+      if (!confirm(`¿Eliminar la categoría "${cat.nombre}"?`)) return;
+      $('gestionError').classList.add('oculto');
+      try {
+        const enUso = await db.collection('gastos').where('categoria', '==', cat.nombre).limit(1).get();
+        if (!enUso.empty) {
+          throw new Error('No se puede eliminar: tiene gastos cargados. Renombrala en vez de borrarla, o pasá esos gastos a otra categoría primero.');
+        }
+        await db.collection('categorias').doc(cat.id).delete();
+        await cargarCategorias();
+        construirGridCategorias();
+        renderGestionCategorias();
+      } catch(e){
+        $('gestionError').textContent = e.message;
+        $('gestionError').classList.remove('oculto');
+      }
+    });
+  });
+}
+
+async function guardarEdicionCategoria(cat, nombreNuevo){
+  if (!nombreNuevo) return;
+  $('gestionError').classList.add('oculto');
+  try {
+    if (nombreNuevo.toLowerCase() !== cat.nombre.toLowerCase()) {
+      const choque = CATEGORIAS.find(c => c.id !== cat.id && c.nombre.toLowerCase() === nombreNuevo.toLowerCase());
+      if (choque) throw new Error('Ya existe una categoría con ese nombre');
+    }
+    await db.collection('categorias').doc(cat.id).update({ nombre: nombreNuevo });
+
+    // Propagar el nombre nuevo a los gastos que ya usaban el nombre viejo
+    if (nombreNuevo !== cat.nombre) {
+      const afectados = await db.collection('gastos').where('categoria', '==', cat.nombre).get();
+      const batch = db.batch();
+      afectados.forEach(doc => batch.update(doc.ref, { categoria: nombreNuevo }));
+      await batch.commit();
+    }
+
+    await cargarCategorias();
+    construirGridCategorias();
+    renderGestionCategorias();
+    cargarMes();
+  } catch(e){
+    $('gestionError').textContent = e.message;
+    $('gestionError').classList.remove('oculto');
+  }
+}
+
+// ---------- MES ----------
+$('mesAnterior').addEventListener('click', () => { mesActual.setMonth(mesActual.getMonth() - 1); cargarMes(); });
+$('mesSiguiente').addEventListener('click', () => { mesActual.setMonth(mesActual.getMonth() + 1); cargarMes(); });
+
+async function obtenerGastosDeMes(mesClave){
+  const desde = mesClave + '-01';
+  const hasta = mesClave + '-31';
+  const snap = await db.collection('gastos')
+    .where('fecha', '>=', desde)
+    .where('fecha', '<=', hasta)
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function cargarMes(){
+  $('mesActual').textContent = nombreMes(mesActual);
+  const mes = claveMes(mesActual);
+
+  const mesAnteriorDt = new Date(mesActual); mesAnteriorDt.setMonth(mesAnteriorDt.getMonth() - 1);
+  const mesAnteriorClave = claveMes(mesAnteriorDt);
+
+  const [gastos, gastosAnterior] = await Promise.all([
+    obtenerGastosDeMes(mes),
+    obtenerGastosDeMes(mesAnteriorClave),
+  ]);
+  gastos.sort((a,b) => b.fecha.localeCompare(a.fecha));
+
+  const total = gastos.reduce((s,g) => s + g.monto, 0);
+  const totalAnterior = gastosAnterior.reduce((s,g) => s + g.monto, 0);
+
+  const porCategoria = {};
+  gastos.forEach(g => { porCategoria[g.categoria] = (porCategoria[g.categoria]||0) + g.monto; });
+  const porCategoriaArr = Object.entries(porCategoria).map(([categoria,total]) => ({categoria,total})).sort((a,b) => b.total - a.total);
+
+  const porUsuario = {};
+  gastos.forEach(g => { porUsuario[g.usuarioNombre] = (porUsuario[g.usuarioNombre]||0) + g.monto; });
+  const porUsuarioArr = Object.entries(porUsuario).map(([usuario,total]) => ({usuario,total}));
+
+  const variacionPct = totalAnterior > 0 ? Math.round(((total - totalAnterior) / totalAnterior) * 1000) / 10 : null;
+
+  const hoy = new Date();
+  const finMes = new Date(mesActual.getFullYear(), mesActual.getMonth()+1, 0);
+  const diasParaPromedio = (mes === claveMes(hoy)) ? hoy.getDate() : finMes.getDate();
+  const promedioDiario = diasParaPromedio > 0 ? Math.round((total/diasParaPromedio)*100)/100 : 0;
+
+  renderTotales(total, porUsuarioArr);
+  renderAnalisis({ totalMes: total, totalMesAnterior: totalAnterior, variacionPct, promedioDiario, categoriaTope: porCategoriaArr[0]||null });
+  renderCategorias(porCategoriaArr);
+  renderLista(gastos);
+}
+
+function renderTotales(total, porUsuarioArr){
+  $('totalMes').textContent = fmt(total);
+  $('subTotalesUsuarios').innerHTML = porUsuarioArr.map(u =>
+    `<div class="chip">${u.usuario}<b>${fmt(u.total)}</b></div>`
+  ).join('') || '<div class="chip">Sin gastos aún</div>';
+}
+
+function renderAnalisis(a){
+  let filaVariacion;
+  if (a.variacionPct === null){
+    filaVariacion = `<div class="analisisFila"><span>Vs. mes anterior</span><span>Sin datos del mes anterior</span></div>`;
+  } else {
+    const subio = a.variacionPct > 0;
+    const clase = subio ? 'subeVerde' : (a.variacionPct < 0 ? 'bajaVerde' : '');
+    const flecha = subio ? '▲' : (a.variacionPct < 0 ? '▼' : '—');
+    filaVariacion = `<div class="analisisFila"><span>Vs. mes anterior (${fmt(a.totalMesAnterior)})</span><span class="${clase}">${flecha} ${Math.abs(a.variacionPct)}%</span></div>`;
+  }
+  const filaTope = a.categoriaTope
+    ? `<div class="analisisFila"><span>Categoría con más gasto</span><span>${iconoDe(a.categoriaTope.categoria)} ${a.categoriaTope.categoria} (${fmt(a.categoriaTope.total)})</span></div>`
+    : '';
+  const filaPromedio = `<div class="analisisFila"><span>Promedio diario</span><span>${fmt(a.promedioDiario)}</span></div>`;
+  $('analisisContenido').innerHTML = filaVariacion + filaTope + filaPromedio;
+}
+
+function renderCategorias(porCategoriaArr){
+  const max = Math.max(1, ...porCategoriaArr.map(c => c.total));
+  const cont = $('resumenCategorias');
+  if (porCategoriaArr.length === 0){
+    cont.innerHTML = '<div class="vacio">Todavía no hay gastos este mes</div>';
+    return;
+  }
+  cont.innerHTML = porCategoriaArr.map(c => `
+    <div class="barra">
+      <span class="nombre">${iconoDe(c.categoria)} ${c.categoria}</span>
+      <span class="fondo"><span class="relleno" style="width:${(c.total/max*100).toFixed(0)}%"></span></span>
+      <span class="monto">${fmt(c.total)}</span>
+    </div>
+  `).join('');
+}
+
+function renderLista(gastos){
+  const cont = $('listaGastos');
+  if (gastos.length === 0){
+    cont.innerHTML = '<div class="vacio">No hay movimientos este mes</div>';
+    return;
+  }
+  cont.innerHTML = gastos.map(g => `
+    <div class="gasto">
+      <div class="info">
+        <span class="cat">${iconoDe(g.categoria)} ${g.categoria}</span>
+        <span class="meta">${g.descripcion ? g.descripcion + ' · ' : ''}${g.usuarioNombre} · ${formatearFecha(g.fecha)}</span>
+      </div>
+      <div style="display:flex;align-items:center">
+        <span class="monto">${fmt(g.monto)}</span>
+        <button class="borrar" data-id="${g.id}" title="Eliminar">✕</button>
+      </div>
+    </div>
+  `).join('');
+
+  cont.querySelectorAll('.borrar').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('¿Eliminar este gasto?')) return;
+      await db.collection('gastos').doc(btn.dataset.id).delete();
+      cargarMes();
+    });
+  });
+}
+
+// ---------- MODAL NUEVO GASTO ----------
+$('btnAgregar').addEventListener('click', () => {
+  categoriaSeleccionada = null;
+  $('catGrid').querySelectorAll('.catBtn').forEach(b => b.classList.remove('activo'));
+  $('inputMonto').value = '';
+  $('inputDescripcion').value = '';
+  $('inputFecha').value = new Date().toISOString().slice(0,10);
+  $('modalError').classList.add('oculto');
+  $('modalFondo').classList.add('abierto');
+});
+$('btnCancelar').addEventListener('click', () => $('modalFondo').classList.remove('abierto'));
+$('modalFondo').addEventListener('click', (e) => { if (e.target === $('modalFondo')) $('modalFondo').classList.remove('abierto'); });
+
+$('btnGuardar').addEventListener('click', async () => {
+  const monto = parseFloat($('inputMonto').value);
+  const descripcion = $('inputDescripcion').value.trim();
+  const fecha = $('inputFecha').value;
+  $('modalError').classList.add('oculto');
+
+  if (!categoriaSeleccionada) return mostrarErrorModal('Elegí una categoría');
+  if (!monto || monto <= 0) return mostrarErrorModal('Ingresá un monto válido');
+  if (!fecha) return mostrarErrorModal('Elegí una fecha');
+
+  try {
+    await db.collection('gastos').add({
+      monto, categoria: categoriaSeleccionada, descripcion, fecha,
+      usuarioUid: usuarioActual.uid, usuarioNombre: usuarioActual.nombre,
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    $('modalFondo').classList.remove('abierto');
+    mesActual = new Date(fecha + 'T00:00:00');
+    cargarMes();
+  } catch(e){
+    mostrarErrorModal(e.message);
+  }
+});
+
+function mostrarErrorModal(msg){
+  $('modalError').textContent = msg;
+  $('modalError').classList.remove('oculto');
+}
+</script>
+</body>
+</html>
