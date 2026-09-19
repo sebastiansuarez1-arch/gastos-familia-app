@@ -1,0 +1,45 @@
+name: Compilar APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias (Capacitor)
+        run: npm ci
+
+      - name: Instalar plataforma y build-tools de Android
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Dar permiso de ejecución a gradlew
+        run: chmod +x android/gradlew
+
+      - name: Compilar APK (debug)
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Publicar el APK como descarga
+        uses: actions/upload-artifact@v4
+        with:
+          name: gastos-familia-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
