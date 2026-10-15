@@ -63,6 +63,11 @@
   .catBtn{padding:12px 4px;border:1.5px solid var(--borde);border-radius:10px;background:#fff;font-size:.82rem;cursor:pointer;text-align:center}
   .catBtn.activo{border-color:var(--azul);background:#eff4ff;color:var(--azul);font-weight:700}
   .catBtn.nueva{border-style:dashed;color:var(--azul);font-weight:700}
+  .subGridCont{margin:-6px 0 14px 0}
+  .subGridLabel{font-size:.78rem;color:#6b7280;margin-bottom:6px}
+  .filaCatGestion.sub{padding-left:22px}
+  .filaCatGestion.principalHeader{font-weight:700;background:var(--fondo);margin:8px -8px 0;padding:10px 8px;border-radius:8px;border-bottom:0}
+  .linkAgregarSub{display:block;font-size:.78rem;color:var(--azul);background:none;border:0;padding:6px 0 12px 22px;cursor:pointer;text-decoration:underline;text-align:left}
   #formNuevaCat{display:none;gap:8px;margin-bottom:14px}
   #formNuevaCat.abierto{display:flex}
   #formNuevaCat input{flex:1}
@@ -212,9 +217,11 @@ const db = firebase.firestore();
 
 const DOMINIO_INTERNO = 'familia.local'; // nombre de usuario -> nombre@familia.local
 
-let CATEGORIAS = []; // [{id, nombre, icono}]
+let CATEGORIAS = []; // [{id, nombre, icono, padre}]  padre=null → categoría principal; padre="Comida" → subcategoría de Comida
 let mesActual = new Date();
 let categoriaSeleccionada = null;
+let categoriaPrincipalExpandida = null; // nombre del principal cuyo grid de subcategorías está abierto
+let nuevaCategoriaPadre = null; // null = la próxima categoría a crear es principal; si tiene nombre, es subcategoría de ese principal
 let usuarioActual = null; // {uid, nombre}
 
 const $ = (id) => document.getElementById(id);
@@ -280,28 +287,81 @@ async function sembrarCategoriasPorDefecto(){
   const batch = db.batch();
   defaults.forEach(([nombre, icono]) => {
     const ref = db.collection('categorias').doc();
-    batch.set(ref, { nombre, icono });
+    batch.set(ref, { nombre, icono, padre: null });
   });
   await batch.commit();
 }
 
 function construirGridCategorias(){
-  const botones = CATEGORIAS.map(c => `
+  const principales = CATEGORIAS.filter(c => !c.padre);
+  const botones = principales.map(c => `
     <button type="button" class="catBtn" data-cat="${c.nombre}">${c.icono} ${c.nombre}</button>
   `).join('');
   $('catGrid').innerHTML = botones + `<button type="button" class="catBtn nueva" id="btnNuevaCat">+ Nueva</button>`;
 
   $('catGrid').querySelectorAll('.catBtn[data-cat]').forEach(btn => {
     btn.addEventListener('click', () => {
-      categoriaSeleccionada = btn.dataset.cat;
+      const nombre = btn.dataset.cat;
+      const subcats = CATEGORIAS.filter(c => c.padre === nombre);
       $('formNuevaCat').classList.remove('abierto');
       $('catGrid').querySelectorAll('.catBtn').forEach(b => b.classList.remove('activo'));
       btn.classList.add('activo');
+      if (subcats.length > 0){
+        categoriaPrincipalExpandida = nombre;
+        categoriaSeleccionada = null; // hay que elegir una subcategoría
+      } else {
+        categoriaPrincipalExpandida = null;
+        categoriaSeleccionada = nombre;
+      }
+      renderSubGrid();
     });
   });
 
   $('btnNuevaCat').addEventListener('click', () => {
+    nuevaCategoriaPadre = null;
     $('formNuevaCat').classList.add('abierto');
+    $('inputNuevaCat').placeholder = 'Nombre de la categoría';
+    $('inputNuevaCat').value = '';
+    $('inputNuevaCat').focus();
+  });
+
+  renderSubGrid();
+}
+
+function renderSubGrid(){
+  let cont = $('subGridCont');
+  if (!categoriaPrincipalExpandida){
+    if (cont) cont.innerHTML = '';
+    return;
+  }
+  const subcats = CATEGORIAS.filter(c => c.padre === categoriaPrincipalExpandida);
+  if (!cont){
+    cont = document.createElement('div');
+    cont.id = 'subGridCont';
+    cont.className = 'subGridCont';
+    $('catGrid').insertAdjacentElement('afterend', cont);
+  }
+  cont.innerHTML = `
+    <div class="subGridLabel">Subcategoría de ${categoriaPrincipalExpandida}</div>
+    <div class="catGrid">
+      ${subcats.map(c => `<button type="button" class="catBtn" data-subcat="${c.nombre}">${c.icono} ${c.nombre}</button>`).join('')}
+      <button type="button" class="catBtn nueva" id="btnNuevaSubcat">+ Nueva</button>
+    </div>
+  `;
+
+  cont.querySelectorAll('.catBtn[data-subcat]').forEach(btn => {
+    if (btn.dataset.subcat === categoriaSeleccionada) btn.classList.add('activo');
+    btn.addEventListener('click', () => {
+      categoriaSeleccionada = btn.dataset.subcat;
+      cont.querySelectorAll('.catBtn[data-subcat]').forEach(b => b.classList.remove('activo'));
+      btn.classList.add('activo');
+      $('formNuevaCat').classList.remove('abierto');
+    });
+  });
+  cont.querySelector('#btnNuevaSubcat').addEventListener('click', () => {
+    nuevaCategoriaPadre = categoriaPrincipalExpandida;
+    $('formNuevaCat').classList.add('abierto');
+    $('inputNuevaCat').placeholder = `Subcategoría de ${categoriaPrincipalExpandida}`;
     $('inputNuevaCat').value = '';
     $('inputNuevaCat').focus();
   });
@@ -314,16 +374,26 @@ async function crearCategoria(){
   const nombre = $('inputNuevaCat').value.trim();
   if (!nombre) return;
   try {
-    const existe = CATEGORIAS.find(c => c.nombre.toLowerCase() === nombre.toLowerCase());
+    const padre = nuevaCategoriaPadre; // null = principal; string = subcategoría de ese principal
+    const hermanas = CATEGORIAS.filter(c => (c.padre || null) === padre);
+    const existe = hermanas.find(c => c.nombre.toLowerCase() === nombre.toLowerCase());
     if (existe) throw new Error('Esa categoría ya existe');
-    await db.collection('categorias').add({ nombre, icono: '🏷️' });
+    await db.collection('categorias').add({ nombre, icono: '🏷️', padre: padre || null });
     await cargarCategorias();
     construirGridCategorias();
-    const btn = [...$('catGrid').querySelectorAll('.catBtn[data-cat]')].find(b => b.dataset.cat === nombre);
-    if (btn){
+    if (padre){
+      categoriaPrincipalExpandida = padre;
       categoriaSeleccionada = nombre;
-      $('catGrid').querySelectorAll('.catBtn').forEach(b => b.classList.remove('activo'));
-      btn.classList.add('activo');
+      const btnPrincipal = [...$('catGrid').querySelectorAll('.catBtn[data-cat]')].find(b => b.dataset.cat === padre);
+      if (btnPrincipal) btnPrincipal.classList.add('activo');
+      renderSubGrid();
+    } else {
+      const btn = [...$('catGrid').querySelectorAll('.catBtn[data-cat]')].find(b => b.dataset.cat === nombre);
+      if (btn){
+        categoriaSeleccionada = nombre;
+        $('catGrid').querySelectorAll('.catBtn').forEach(b => b.classList.remove('activo'));
+        btn.classList.add('activo');
+      }
     }
     $('formNuevaCat').classList.remove('abierto');
   } catch(e){
@@ -341,14 +411,26 @@ $('btnCerrarGestion').addEventListener('click', () => $('modalGestionFondo').cla
 $('modalGestionFondo').addEventListener('click', (e) => { if (e.target === $('modalGestionFondo')) $('modalGestionFondo').classList.remove('abierto'); });
 
 function renderGestionCategorias(){
+  const principales = CATEGORIAS.filter(c => !c.padre);
   const cont = $('listaCategoriasGestion');
-  cont.innerHTML = CATEGORIAS.map(c => `
-    <div class="filaCatGestion" data-id="${c.id}">
-      <span class="nombreCat">${c.icono} ${c.nombre}</span>
-      <button type="button" class="btnEditarCat" title="Renombrar">✏️</button>
-      <button type="button" class="btnBorrarCat" title="Eliminar">🗑️</button>
-    </div>
-  `).join('');
+  cont.innerHTML = principales.map(p => {
+    const subs = CATEGORIAS.filter(c => c.padre === p.nombre);
+    return `
+      <div class="filaCatGestion principalHeader" data-id="${p.id}">
+        <span class="nombreCat">${p.icono} ${p.nombre}</span>
+        <button type="button" class="btnEditarCat" title="Renombrar">✏️</button>
+        <button type="button" class="btnBorrarCat" title="Eliminar">🗑️</button>
+      </div>
+      ${subs.map(s => `
+        <div class="filaCatGestion sub" data-id="${s.id}">
+          <span class="nombreCat">↳ ${s.icono} ${s.nombre}</span>
+          <button type="button" class="btnEditarCat" title="Renombrar">✏️</button>
+          <button type="button" class="btnBorrarCat" title="Eliminar">🗑️</button>
+        </div>
+      `).join('')}
+      <button type="button" class="linkAgregarSub" data-padre="${p.nombre}">+ Agregar subcategoría a "${p.nombre}"</button>
+    `;
+  }).join('') + `<button type="button" class="linkChico" id="btnNuevaCatPrincipalGestion" style="margin-top:10px">+ Nueva categoría principal</button>`;
 
   cont.querySelectorAll('.filaCatGestion').forEach(fila => {
     const id = fila.dataset.id;
@@ -371,6 +453,10 @@ function renderGestionCategorias(){
       if (!confirm(`¿Eliminar la categoría "${cat.nombre}"?`)) return;
       $('gestionError').classList.add('oculto');
       try {
+        const tieneSubcats = !cat.padre && CATEGORIAS.some(c => c.padre === cat.nombre);
+        if (tieneSubcats) {
+          throw new Error('No se puede eliminar: tiene subcategorías. Borralas primero (o movelas a otra categoría principal).');
+        }
         const enUso = await db.collection('gastos').where('categoria', '==', cat.nombre).limit(1).get();
         if (!enUso.empty) {
           throw new Error('No se puede eliminar: tiene gastos cargados. Renombrala en vez de borrarla, o pasá esos gastos a otra categoría primero.');
@@ -385,6 +471,33 @@ function renderGestionCategorias(){
       }
     });
   });
+
+  cont.querySelectorAll('.linkAgregarSub').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $('modalGestionFondo').classList.remove('abierto');
+      nuevaCategoriaPadre = btn.dataset.padre;
+      categoriaPrincipalExpandida = btn.dataset.padre;
+      construirGridCategorias();
+      const btnPrincipal = [...$('catGrid').querySelectorAll('.catBtn[data-cat]')].find(b => b.dataset.cat === btn.dataset.padre);
+      if (btnPrincipal) btnPrincipal.classList.add('activo');
+      $('formNuevaCat').classList.add('abierto');
+      $('inputNuevaCat').placeholder = `Subcategoría de ${btn.dataset.padre}`;
+      $('inputNuevaCat').value = '';
+      $('inputNuevaCat').focus();
+    });
+  });
+
+  const btnNuevaPrincipal = $('btnNuevaCatPrincipalGestion');
+  if (btnNuevaPrincipal) btnNuevaPrincipal.addEventListener('click', () => {
+    $('modalGestionFondo').classList.remove('abierto');
+    nuevaCategoriaPadre = null;
+    categoriaPrincipalExpandida = null;
+    construirGridCategorias();
+    $('formNuevaCat').classList.add('abierto');
+    $('inputNuevaCat').placeholder = 'Nombre de la categoría';
+    $('inputNuevaCat').value = '';
+    $('inputNuevaCat').focus();
+  });
 }
 
 async function guardarEdicionCategoria(cat, nombreNuevo){
@@ -392,18 +505,25 @@ async function guardarEdicionCategoria(cat, nombreNuevo){
   $('gestionError').classList.add('oculto');
   try {
     if (nombreNuevo.toLowerCase() !== cat.nombre.toLowerCase()) {
-      const choque = CATEGORIAS.find(c => c.id !== cat.id && c.nombre.toLowerCase() === nombreNuevo.toLowerCase());
-      if (choque) throw new Error('Ya existe una categoría con ese nombre');
+      const hermanas = CATEGORIAS.filter(c => (c.padre || null) === (cat.padre || null) && c.id !== cat.id);
+      const choque = hermanas.find(c => c.nombre.toLowerCase() === nombreNuevo.toLowerCase());
+      if (choque) throw new Error('Ya existe una categoría con ese nombre en ese mismo nivel');
     }
     await db.collection('categorias').doc(cat.id).update({ nombre: nombreNuevo });
 
-    // Propagar el nombre nuevo a los gastos que ya usaban el nombre viejo
+    const batch = db.batch();
+    let huboCambios = false;
     if (nombreNuevo !== cat.nombre) {
+      // Propagar el nombre nuevo a los gastos que ya usaban el nombre viejo
       const afectados = await db.collection('gastos').where('categoria', '==', cat.nombre).get();
-      const batch = db.batch();
-      afectados.forEach(doc => batch.update(doc.ref, { categoria: nombreNuevo }));
-      await batch.commit();
+      afectados.forEach(doc => { batch.update(doc.ref, { categoria: nombreNuevo }); huboCambios = true; });
+      // Si es una categoría principal, actualizar el "padre" guardado en sus subcategorías
+      if (!cat.padre) {
+        const hijas = CATEGORIAS.filter(c => c.padre === cat.nombre);
+        hijas.forEach(h => { batch.update(db.collection('categorias').doc(h.id), { padre: nombreNuevo }); huboCambios = true; });
+      }
     }
+    if (huboCambios) await batch.commit();
 
     await cargarCategorias();
     construirGridCategorias();
@@ -537,6 +657,8 @@ function renderLista(gastos){
 // ---------- MODAL NUEVO GASTO ----------
 $('btnAgregar').addEventListener('click', () => {
   categoriaSeleccionada = null;
+  categoriaPrincipalExpandida = null;
+  renderSubGrid();
   $('catGrid').querySelectorAll('.catBtn').forEach(b => b.classList.remove('activo'));
   $('inputMonto').value = '';
   $('inputDescripcion').value = '';
