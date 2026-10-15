@@ -88,10 +88,11 @@
   .filaCatGestion{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--borde)}
   .filaCatGestion:last-child{border-bottom:0}
   .filaCatGestion .nombreCat{flex:1;font-size:.92rem}
-  .filaCatGestion input{flex:1;padding:8px 10px;font-size:.92rem}
+  .filaCatGestion input, .filaCatGestion select{flex:1;padding:8px 10px;font-size:.92rem}
   .filaCatGestion button{background:none;border:0;font-size:1rem;padding:6px;cursor:pointer;flex-shrink:0}
   .filaCatGestion .btnBorrarCat{color:var(--rojo)}
   .filaCatGestion .btnEditarCat{color:var(--azul)}
+  .filaCatGestion .btnMoverCat{color:var(--azul)}
   .filaCatGestion .btnGuardarEdicion{color:var(--verde)}
 
   .oculto{display:none !important}
@@ -375,9 +376,8 @@ async function crearCategoria(){
   if (!nombre) return;
   try {
     const padre = nuevaCategoriaPadre; // null = principal; string = subcategoría de ese principal
-    const hermanas = CATEGORIAS.filter(c => (c.padre || null) === padre);
-    const existe = hermanas.find(c => c.nombre.toLowerCase() === nombre.toLowerCase());
-    if (existe) throw new Error('Esa categoría ya existe');
+    const existe = CATEGORIAS.find(c => c.nombre.toLowerCase() === nombre.toLowerCase());
+    if (existe) throw new Error(`Ya existe una categoría "${existe.nombre}". Si querés moverla acá, usá el botón 📥 en "Gestionar categorías" en vez de crear una nueva.`);
     await db.collection('categorias').add({ nombre, icono: '🏷️', padre: padre || null });
     await cargarCategorias();
     construirGridCategorias();
@@ -418,12 +418,14 @@ function renderGestionCategorias(){
     return `
       <div class="filaCatGestion principalHeader" data-id="${p.id}">
         <span class="nombreCat">${p.icono} ${p.nombre}</span>
+        <button type="button" class="btnMoverCat" title="Mover a subcategoría de...">📥</button>
         <button type="button" class="btnEditarCat" title="Renombrar">✏️</button>
         <button type="button" class="btnBorrarCat" title="Eliminar">🗑️</button>
       </div>
       ${subs.map(s => `
         <div class="filaCatGestion sub" data-id="${s.id}">
           <span class="nombreCat">↳ ${s.icono} ${s.nombre}</span>
+          <button type="button" class="btnMoverCat" title="Mover...">📥</button>
           <button type="button" class="btnEditarCat" title="Renombrar">✏️</button>
           <button type="button" class="btnBorrarCat" title="Eliminar">🗑️</button>
         </div>
@@ -449,6 +451,21 @@ function renderGestionCategorias(){
       fila.querySelectorAll('.btnBorrarCat')[0].addEventListener('click', () => renderGestionCategorias());
     });
 
+    fila.querySelector('.btnMoverCat').addEventListener('click', () => {
+      const destinos = CATEGORIAS.filter(c => !c.padre && c.id !== cat.id);
+      const opciones = [`<option value="">— Categoría principal (sin padre) —</option>`]
+        .concat(destinos.map(p => `<option value="${p.nombre}">${p.icono} ${p.nombre}</option>`));
+      fila.innerHTML = `
+        <select class="selectMoverCat">${opciones.join('')}</select>
+        <button type="button" class="btnGuardarEdicion" title="Mover">✔️</button>
+        <button type="button" class="btnBorrarCat" title="Cancelar">✕</button>
+      `;
+      const sel = fila.querySelector('.selectMoverCat');
+      sel.value = cat.padre || '';
+      fila.querySelector('.btnGuardarEdicion').addEventListener('click', () => moverCategoria(cat, sel.value || null));
+      fila.querySelectorAll('.btnBorrarCat')[0].addEventListener('click', () => renderGestionCategorias());
+    });
+
     fila.querySelector('.btnBorrarCat').addEventListener('click', async () => {
       if (!confirm(`¿Eliminar la categoría "${cat.nombre}"?`)) return;
       $('gestionError').classList.add('oculto');
@@ -457,9 +474,14 @@ function renderGestionCategorias(){
         if (tieneSubcats) {
           throw new Error('No se puede eliminar: tiene subcategorías. Borralas primero (o movelas a otra categoría principal).');
         }
-        const enUso = await db.collection('gastos').where('categoria', '==', cat.nombre).limit(1).get();
-        if (!enUso.empty) {
-          throw new Error('No se puede eliminar: tiene gastos cargados. Renombrala en vez de borrarla, o pasá esos gastos a otra categoría primero.');
+        // Si hay OTRA categoría con el mismo nombre (p.ej. un duplicado), los gastos existentes
+        // van a seguir matcheando contra esa otra, así que borrar esta no deja gastos huérfanos.
+        const otraConMismoNombre = CATEGORIAS.some(c => c.id !== cat.id && c.nombre === cat.nombre);
+        if (!otraConMismoNombre) {
+          const enUso = await db.collection('gastos').where('categoria', '==', cat.nombre).limit(1).get();
+          if (!enUso.empty) {
+            throw new Error('No se puede eliminar: tiene gastos cargados. Renombrala en vez de borrarla, o pasá esos gastos a otra categoría primero.');
+          }
         }
         await db.collection('categorias').doc(cat.id).delete();
         await cargarCategorias();
@@ -500,14 +522,37 @@ function renderGestionCategorias(){
   });
 }
 
+async function moverCategoria(cat, nuevoPadre){
+  $('gestionError').classList.add('oculto');
+  try {
+    if (nuevoPadre && nuevoPadre.toLowerCase() === cat.nombre.toLowerCase()) {
+      throw new Error('Una categoría no puede ser subcategoría de sí misma');
+    }
+    if ((cat.padre || null) === (nuevoPadre || null)) { renderGestionCategorias(); return; }
+    const tieneHijasPropias = CATEGORIAS.some(c => c.padre === cat.nombre);
+    if (nuevoPadre && tieneHijasPropias) {
+      throw new Error('Esta categoría tiene subcategorías propias. Movelas o eliminalas antes de convertirla en subcategoría de otra.');
+    }
+    const hermanasDestino = CATEGORIAS.filter(c => (c.padre || null) === (nuevoPadre || null) && c.id !== cat.id);
+    const choque = hermanasDestino.find(c => c.nombre.toLowerCase() === cat.nombre.toLowerCase());
+    if (choque) throw new Error('Ya existe una categoría con ese nombre en el destino');
+    await db.collection('categorias').doc(cat.id).update({ padre: nuevoPadre || null });
+    await cargarCategorias();
+    construirGridCategorias();
+    renderGestionCategorias();
+  } catch(e){
+    $('gestionError').textContent = e.message;
+    $('gestionError').classList.remove('oculto');
+  }
+}
+
 async function guardarEdicionCategoria(cat, nombreNuevo){
   if (!nombreNuevo) return;
   $('gestionError').classList.add('oculto');
   try {
     if (nombreNuevo.toLowerCase() !== cat.nombre.toLowerCase()) {
-      const hermanas = CATEGORIAS.filter(c => (c.padre || null) === (cat.padre || null) && c.id !== cat.id);
-      const choque = hermanas.find(c => c.nombre.toLowerCase() === nombreNuevo.toLowerCase());
-      if (choque) throw new Error('Ya existe una categoría con ese nombre en ese mismo nivel');
+      const choque = CATEGORIAS.find(c => c.nombre.toLowerCase() === nombreNuevo.toLowerCase() && c.id !== cat.id);
+      if (choque) throw new Error('Ya existe una categoría con ese nombre');
     }
     await db.collection('categorias').doc(cat.id).update({ nombre: nombreNuevo });
 
