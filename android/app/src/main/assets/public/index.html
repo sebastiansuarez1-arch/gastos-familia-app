@@ -43,6 +43,10 @@
   .barra .fondo{flex:1;background:var(--fondo);border-radius:6px;height:10px;overflow:hidden}
   .barra .relleno{background:var(--azul);height:100%;border-radius:6px}
   .barra .monto{width:80px;text-align:right;flex-shrink:0}
+  .barraSub{opacity:.82}
+  .barraSub .nombre{padding-left:16px;font-size:.78rem}
+  .barraSub .fondo{height:7px}
+  .barraSub .monto{font-size:.8rem}
 
   .gasto{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--borde)}
   .gasto:last-child{border-bottom:0}
@@ -57,7 +61,7 @@
 
   #modalFondo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;align-items:flex-end;justify-content:center}
   #modalFondo.abierto{display:flex}
-  #modal,#modalGestion{background:#fff;width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:20px;max-height:85vh;overflow-y:auto}
+  #modal,#modalGestion{background:#fff;width:100%;max-width:560px;border-radius:18px 18px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom)) 20px;max-height:85vh;overflow-y:auto}
   #modal h2,#modalGestion h2{margin-top:0;font-size:1.1rem}
   .catGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
   .catBtn{padding:12px 4px;border:1.5px solid var(--borde);border-radius:10px;background:#fff;font-size:.82rem;cursor:pointer;text-align:center}
@@ -656,19 +660,50 @@ function renderAnalisis(a){
   $('analisisContenido').innerHTML = filaVariacion + filaTope + filaPromedio;
 }
 
+function agruparPorPrincipal(porCategoriaArr){
+  // Agrupa los totales por categoría principal, metiendo las subcategorías adentro.
+  // Una categoría sin padre (o que ya no existe en CATEGORIAS) se agrupa bajo sí misma.
+  const grupos = {}; // nombrePrincipal -> { total, subs: {nombreSub: total} }
+  porCategoriaArr.forEach(({categoria, total}) => {
+    const catInfo = CATEGORIAS.find(c => c.nombre === categoria);
+    const padre = catInfo ? catInfo.padre : null;
+    const nombrePrincipal = padre || categoria;
+    if (!grupos[nombrePrincipal]) grupos[nombrePrincipal] = { total: 0, subs: {} };
+    grupos[nombrePrincipal].total += total;
+    if (padre) {
+      grupos[nombrePrincipal].subs[categoria] = (grupos[nombrePrincipal].subs[categoria] || 0) + total;
+    }
+  });
+  return Object.entries(grupos)
+    .map(([nombre, datos]) => ({
+      nombre,
+      total: datos.total,
+      subs: Object.entries(datos.subs).map(([sub, total]) => ({ sub, total })).sort((a,b) => b.total - a.total),
+    }))
+    .sort((a,b) => b.total - a.total);
+}
+
 function renderCategorias(porCategoriaArr){
-  const max = Math.max(1, ...porCategoriaArr.map(c => c.total));
   const cont = $('resumenCategorias');
   if (porCategoriaArr.length === 0){
     cont.innerHTML = '<div class="vacio">Todavía no hay gastos este mes</div>';
     return;
   }
-  cont.innerHTML = porCategoriaArr.map(c => `
+  const grupos = agruparPorPrincipal(porCategoriaArr);
+  const max = Math.max(1, ...grupos.map(g => g.total));
+  cont.innerHTML = grupos.map(g => `
     <div class="barra">
-      <span class="nombre">${iconoDe(c.categoria)} ${c.categoria}</span>
-      <span class="fondo"><span class="relleno" style="width:${(c.total/max*100).toFixed(0)}%"></span></span>
-      <span class="monto">${fmt(c.total)}</span>
+      <span class="nombre">${iconoDe(g.nombre)} ${g.nombre}</span>
+      <span class="fondo"><span class="relleno" style="width:${(g.total/max*100).toFixed(0)}%"></span></span>
+      <span class="monto">${fmt(g.total)}</span>
     </div>
+    ${g.subs.map(s => `
+      <div class="barra barraSub">
+        <span class="nombre">↳ ${iconoDe(s.sub)} ${s.sub}</span>
+        <span class="fondo"><span class="relleno" style="width:${(s.total/max*100).toFixed(0)}%"></span></span>
+        <span class="monto">${fmt(s.total)}</span>
+      </div>
+    `).join('')}
   `).join('');
 }
 
