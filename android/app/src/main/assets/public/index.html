@@ -470,13 +470,14 @@ function renderGestionCategorias(){
       if (!confirm(`¿Eliminar la categoría "${cat.nombre}"?`)) return;
       $('gestionError').classList.add('oculto');
       try {
-        const tieneSubcats = !cat.padre && CATEGORIAS.some(c => c.padre === cat.nombre);
-        if (tieneSubcats) {
+        // Si hay OTRA categoría con el mismo nombre (p.ej. un duplicado), tanto sus
+        // subcategorías como sus gastos existentes van a seguir matcheando contra esa
+        // otra, así que borrar esta no deja nada huérfano.
+        const otraConMismoNombre = CATEGORIAS.some(c => c.id !== cat.id && c.nombre === cat.nombre);
+        const tieneSubcatsHuerfanas = !cat.padre && !otraConMismoNombre && CATEGORIAS.some(c => c.padre === cat.nombre);
+        if (tieneSubcatsHuerfanas) {
           throw new Error('No se puede eliminar: tiene subcategorías. Borralas primero (o movelas a otra categoría principal).');
         }
-        // Si hay OTRA categoría con el mismo nombre (p.ej. un duplicado), los gastos existentes
-        // van a seguir matcheando contra esa otra, así que borrar esta no deja gastos huérfanos.
-        const otraConMismoNombre = CATEGORIAS.some(c => c.id !== cat.id && c.nombre === cat.nombre);
         if (!otraConMismoNombre) {
           const enUso = await db.collection('gastos').where('categoria', '==', cat.nombre).limit(1).get();
           if (!enUso.empty) {
