@@ -289,9 +289,12 @@ async function sembrarCategoriasPorDefecto(){
     ['Comida','🍽️'], ['Supermercado','🛒'], ['Quiosco','🍬'], ['Transporte','🚌'],
     ['Regalos','🎁'], ['Gastos escolares','🎒'], ['Salud','💊'], ['Hogar','🏠'], ['Otros','📦'],
   ];
+  // ID fijo por nombre: si por una carrera (dos celulares o dos aperturas a la vez) esto se
+  // ejecuta más de una vez, escribe sobre los MISMOS documentos en vez de duplicar categorías.
+  const slug = (t) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_');
   const batch = db.batch();
   defaults.forEach(([nombre, icono]) => {
-    const ref = db.collection('categorias').doc();
+    const ref = db.collection('categorias').doc('def_' + slug(nombre));
     batch.set(ref, { nombre, icono, padre: null });
   });
   await batch.commit();
