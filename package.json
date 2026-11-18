@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "sync": "cap sync android"
+    "sync": "cap sync android",
+    "deploy": "npx --yes firebase-tools deploy --only hosting --project gastos-familia-suarez"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

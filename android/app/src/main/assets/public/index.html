@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gastos de la Familia</title>
 <meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root{
     --azul:#2563eb; --azul-d:#1d4ed8; --fondo:#f4f6fb; --texto:#1f2430;
@@ -126,7 +129,7 @@
 
 <div id="vistaApp" class="oculto">
   <header>
-    <h1>💸 Gastos Familia<span class="version">V.02</span></h1>
+    <h1>💸 Gastos Familia<span class="version">V.03</span></h1>
     <div style="display:flex;align-items:center;gap:10px">
       <span class="usuario" id="nombreUsuario"></span>
       <button id="btnSalir">Salir</button>
@@ -215,6 +218,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script>
+// Versión web instalable (Chrome > Instalar). En la app Android (localhost) no se registra.
+if ('serviceWorker' in navigator && location.hostname !== 'localhost') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
 
 <script>
 firebase.initializeApp(firebaseConfig);
