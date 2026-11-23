@@ -58,6 +58,7 @@
   .gasto .cat{font-weight:600;font-size:.95rem}
   .gasto .meta{font-size:.78rem;color:#6b7280;margin-top:2px}
   .gasto .monto{font-weight:700;color:var(--texto);margin-right:10px}
+  .gasto .editar{background:none;border:0;font-size:1rem;padding:4px 6px;cursor:pointer}
   .gasto .borrar{background:none;border:0;color:var(--rojo);font-size:1.1rem;padding:4px 8px;cursor:pointer}
   .vacio{text-align:center;color:#6b7280;padding:30px 0;font-size:.9rem}
 
@@ -129,7 +130,7 @@
 
 <div id="vistaApp" class="oculto">
   <header>
-    <h1>💸 Gastos Familia<span class="version">V.05</span></h1>
+    <h1>💸 Gastos Familia<span class="version">V.06</span></h1>
     <div style="display:flex;align-items:center;gap:10px">
       <span class="usuario" id="nombreUsuario"></span>
       <button id="btnSalir">Salir</button>
@@ -170,7 +171,7 @@
 
 <div id="modalFondo">
   <div id="modal">
-    <h2>Nuevo gasto</h2>
+    <h2 id="modalTitulo">Nuevo gasto</h2>
     <div class="campo">
       <label>Categoría</label>
       <div class="catGrid" id="catGrid"></div>
@@ -234,6 +235,8 @@ const DOMINIO_INTERNO = 'familia.local'; // nombre de usuario -> nombre@familia.
 
 let CATEGORIAS = []; // [{id, nombre, icono, padre}]  padre=null → categoría principal; padre="Comida" → subcategoría de Comida
 let mesActual = new Date();
+let editandoId = null; // id del gasto que se está editando (null = gasto nuevo)
+let listaGastosActual = [];
 let categoriaSeleccionada = null;
 let categoriaPrincipalExpandida = null; // nombre del principal cuyo grid de subcategorías está abierto
 let nuevaCategoriaPadre = null; // null = la próxima categoría a crear es principal; si tiene nombre, es subcategoría de ese principal
@@ -722,6 +725,7 @@ function renderCategorias(porCategoriaArr){
 }
 
 function renderLista(gastos){
+  listaGastosActual = gastos;
   const cont = $('listaGastos');
   if (gastos.length === 0){
     cont.innerHTML = '<div class="vacio">No hay movimientos este mes</div>';
@@ -735,10 +739,18 @@ function renderLista(gastos){
       </div>
       <div style="display:flex;align-items:center">
         <span class="monto">${fmt(g.monto)}</span>
+        <button class="editar" data-id="${g.id}" title="Editar">✏️</button>
         <button class="borrar" data-id="${g.id}" title="Eliminar">✕</button>
       </div>
     </div>
   `).join('');
+
+  cont.querySelectorAll('.editar').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const g = listaGastosActual.find(x => x.id === btn.dataset.id);
+      if (g) editarGasto(g);
+    });
+  });
 
   cont.querySelectorAll('.borrar').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -749,8 +761,27 @@ function renderLista(gastos){
   });
 }
 
-// ---------- MODAL NUEVO GASTO ----------
+// ---------- MODAL NUEVO GASTO / EDITAR GASTO ----------
+function editarGasto(g){
+  editandoId = g.id;
+  $('modalTitulo').textContent = 'Editar gasto';
+  const info = CATEGORIAS.find(c => c.nombre === g.categoria);
+  const principal = (info && info.padre) ? info.padre : g.categoria;
+  categoriaSeleccionada = g.categoria;
+  categoriaPrincipalExpandida = (info && info.padre) ? info.padre : null;
+  $('formNuevaCat').classList.remove('abierto');
+  $('catGrid').querySelectorAll('.catBtn').forEach(b => b.classList.toggle('activo', b.dataset.cat === principal));
+  renderSubGrid();
+  $('inputMonto').value = g.monto;
+  $('inputDescripcion').value = g.descripcion || '';
+  $('inputFecha').value = g.fecha;
+  $('modalError').classList.add('oculto');
+  $('modalFondo').classList.add('abierto');
+}
+
 $('btnAgregar').addEventListener('click', () => {
+  editandoId = null;
+  $('modalTitulo').textContent = 'Nuevo gasto';
   categoriaSeleccionada = null;
   categoriaPrincipalExpandida = null;
   renderSubGrid();
@@ -775,11 +806,17 @@ $('btnGuardar').addEventListener('click', async () => {
   if (!fecha) return mostrarErrorModal('Elegí una fecha');
 
   try {
-    await db.collection('gastos').add({
-      monto, categoria: categoriaSeleccionada, descripcion, fecha,
-      usuarioUid: usuarioActual.uid, usuarioNombre: usuarioActual.nombre,
-      creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
-    });
+    if (editandoId){
+      // Solo se tocan los campos editables; quién lo cargó y cuándo se conservan.
+      await db.collection('gastos').doc(editandoId).update({ monto, categoria: categoriaSeleccionada, descripcion, fecha });
+      editandoId = null;
+    } else {
+      await db.collection('gastos').add({
+        monto, categoria: categoriaSeleccionada, descripcion, fecha,
+        usuarioUid: usuarioActual.uid, usuarioNombre: usuarioActual.nombre,
+        creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
     $('modalFondo').classList.remove('abierto');
     mesActual = new Date(fecha + 'T00:00:00');
     cargarMes();
