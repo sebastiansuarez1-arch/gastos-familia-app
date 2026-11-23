@@ -129,7 +129,7 @@
 
 <div id="vistaApp" class="oculto">
   <header>
-    <h1>💸 Gastos Familia<span class="version">V.04</span></h1>
+    <h1>💸 Gastos Familia<span class="version">V.05</span></h1>
     <div style="display:flex;align-items:center;gap:10px">
       <span class="usuario" id="nombreUsuario"></span>
       <button id="btnSalir">Salir</button>
@@ -623,7 +623,8 @@ async function cargarMes(){
     obtenerGastosDeMes(mes),
     obtenerGastosDeMes(mesAnteriorClave),
   ]);
-  gastos.sort((a,b) => b.fecha.localeCompare(a.fecha));
+  const msCreado = g => (g.creadoEn && g.creadoEn.toMillis) ? g.creadoEn.toMillis() : 0;
+  gastos.sort((a,b) => b.fecha.localeCompare(a.fecha) || msCreado(b) - msCreado(a));
 
   const total = gastos.reduce((s,g) => s + g.monto, 0);
   const totalAnterior = gastosAnterior.reduce((s,g) => s + g.monto, 0);
